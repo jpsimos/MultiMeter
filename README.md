@@ -1,7 +1,7 @@
 # MultiMeter
 PZEM-004x sensor reading for the Raspberry Pi. The project objectives are to provide a daemonizable utility
 that is capable of reading from multiple PZEM-004x devices while maintaining a record of the measurements and alarms.
-Alarm conditions must be paired with a device and a measurement, conversely a measurement does not need an alarm condition.
+A measurement does not need an alarm condition.
 
 # SQLITE database
 The tool uses an SQLITE3 database to store details about each PZEM-004x necessary to communicate.
