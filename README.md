@@ -1,5 +1,5 @@
 # MultiMeter
-PZEM-004x sensor reading for the Raspberry Pi. The project objectives are to provide a daemonizable utility
+PZEM-004x sensor reading for the Raspberry Pi. The project objectives are to provide a daemon utility
 that is capable of reading from multiple PZEM-004x devices while maintaining a record of the measurements and alarms.
 A measurement does not need an alarm condition.
 
