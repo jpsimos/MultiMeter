@@ -40,7 +40,7 @@ switch($_POST['request'])
 	case 'tv up':
 			if(syslog(LOG_NOTICE, 'tv stand motor up requested'))
 			{
-				exec("/usr/bin/curl --silent --get --data-urlencode 'command=lift up 2000' http://tvstand.lan", $output, $result);
+				exec("/usr/bin/curl --silent --get --data-urlencode 'command=lift up 2000' http://tvstand.local", $output, $result);
 				successAndExit(array(
 					'messageBoxTitle' => 'TV stand raise up requested',
 					'messageBoxBody' => 'Please be patient.'
@@ -51,7 +51,7 @@ switch($_POST['request'])
 	case 'tv down':
 			if(syslog(LOG_NOTICE, 'tv stand motor down requested'))
 			{
-				exec("/usr/bin/curl --silent --get --data-urlencode 'command=lift down 2000' http://tvstand.lan", $output, $result);
+				exec("/usr/bin/curl --silent --get --data-urlencode 'command=lift down 2000' http://tvstand.local", $output, $result);
 				successAndExit(array(
 					'messageBoxTitle' => 'TV stand raise down requested',
 					'messageBoxBody' => 'Please be patient.'
