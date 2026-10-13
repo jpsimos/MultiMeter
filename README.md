@@ -1,8 +1,6 @@
 # MultiMeter
 
-PZEM-004x sensor reading for the Raspberry Pi. The project objectives are to provide a daemon utility
-that is capable of reading from multiple PZEM-004x devices while maintaining a record of the measurements and alarms.
-A measurement does not need an alarm condition.
+PZEM-004x sensor reading for the Raspberry Pi. The project provides a daemon utility capable of reading from multiple PZEM-004x devices while maintaining a record of the measurements and alarms. A measurement does not need an alarm condition.
 
 **Author:** Jacob A. Psimos
 
@@ -14,6 +12,7 @@ A measurement does not need an alarm condition.
 - Configurable alarm wattage threshold written to the sensor
 - Optional output-enable pin control for shared bus or power gating
 - Simple command-line interface suitable for daemon or cron use
+- Lightweight web interface (`universe/`) for live viewing of measurements
 
 ## Hardware
 
@@ -43,13 +42,11 @@ Default database path: `/var/db/multimeter.db` (override with `--db`).
 
 ## Alarm
 
-The PZEM-004x supplies an alarm out pin that enables the Raspberry Pi to detect an alarm condition
-without needing to use serial. Not all PZEM-004x boards have it. Code modifications are needed if it does not.
+The PZEM-004x supplies an alarm out pin that enables the Raspberry Pi to detect an alarm condition without needing to use serial. Not all PZEM-004x boards have it. Code modifications are needed if it does not.
 
-The PZEM-004x alarm pin is active low so the most efficient way to detect an alarm without serial is to
-use the Broadcom's edge event register (`PinController`).
+The PZEM-004x alarm pin is active low so the most efficient way to detect an alarm without serial is to use the Broadcom's edge event register (`PinController`).
 
-## Building
+## Building the daemon
 
 Dependencies:
 
@@ -105,35 +102,63 @@ Examples:
 
 Exit status is a bit-mask of error conditions defined in `Main.cpp` (bad arguments, serial failure, DB errors, signal, etc.).
 
-## LineChart.js — Custom Lightweight Visualization
+## Web Interface (`universe/`)
 
-The measurement history stored in SQLite is intended to be visualized with a purpose-built **LineChart.js**.
+The `universe/` directory contains a lightweight PHP + HTML5 + JavaScript web front-end that reads the SQLite database and displays live measurements and charts.
 
-This is a deliberately minimal, dependency-free line-chart implementation written for the MultiMeter data model. It is custom rather than a wrapper around Chart.js, D3, or Highcharts for two reasons:
+### Requirements
 
-1. **Lightweight** – No external libraries, no CSS frameworks, and a tiny footprint. It can be served from a static directory on the Pi or embedded in a small status page without pulling in hundreds of kilobytes of third-party code.
-2. **Simplicity** – The API is reduced to the essentials needed for time-series power data: an array of `{t, v}` points (epoch + value), a canvas element, and a handful of options (color, fill, min/max, label formatter). There are no plugins, no animation system, and no configuration objects that require reading a manual.
+The web interface **must be hosted on a capable HTTP server** such as Apache (with `mod_php` or PHP-FPM), nginx with PHP-FPM, or any other web server that can execute PHP and serve static files. It is not a standalone executable—place the `universe/` tree under the server’s document root (or a subdirectory) and ensure the PHP process can read the MultiMeter SQLite database.
 
-Typical usage with data exported from the `Measurements_And_Alarms` view:
+### Overview
 
-```javascript
-const chart = new LineChart(canvas, {
-  color: "#1e88e5",
-  fill: "rgba(30,136,229,0.15)",
-  yLabel: "W",
-  formatX: (epoch) => new Date(epoch * 1000).toLocaleTimeString()
-});
+- Entry point: `universe/index.php`
+- Tab-based UI (Main, Multimeter, System)
+- AJAX polling via `universe/invoke/pzemInvoker.php` for live data
+- Uses jQuery + Bootstrap for minimal chrome
+- Live multi-series chart powered by the custom `LineChart.js`
 
-chart.setData([
-  { t: 1697000000, v: 42.3 },
-  { t: 1697000060, v: 45.1 },
-  // … rows from SQLite
-]);
+Typical setup on Apache:
+
+```apache
+# Example virtual host snippet
+DocumentRoot /var/www/multimeter/universe
+<Directory /var/www/multimeter/universe>
+    AllowOverride All
+    Require all granted
+</Directory>
 ```
 
-The chart draws directly to a `<canvas>`, handles high-DPI scaling, and only re-renders when `setData` is called. Because the MultiMeter daemon already timestamps every sample, the x-axis is a simple linear scale of Unix epochs; no date library is required.
+Ensure the PHP user has read access to the SQLite database file and that the database path used by the invoker matches the one written by the daemon.
 
-This design keeps the visualization layer as easy to maintain as the C++ daemon itself—small, obvious, and free of unnecessary abstractions.
+## LineChart.js — Custom Lightweight Visualization
+
+The web interface visualizes measurement history with a purpose-built **`universe/js/LineChart.js`**.
+
+This is a deliberately minimal, dependency-free (beyond the page’s existing jQuery) canvas line-chart written specifically for MultiMeter data. It is custom rather than a wrapper around Chart.js, D3, or Highcharts for two reasons:
+
+1. **Lightweight** – ~4.8 KB of plain JavaScript. No charting library, no plugins, no animation system, and no large dependency tree. It draws directly to a `<canvas>` and only re-renders when data or size changes.
+2. **Simplicity** – The public surface is intentionally small:
+   - `new LineChart(canvasId)`
+   - `SetData(seriesName, numberArray, color)` — stores a series and immediately refreshes
+   - Automatic multi-series support (Wattage, Voltage, Current, etc.)
+   - Debounced window-resize handling (75 ms) so the chart stays responsive without thrashing the CPU
+   - Simple axis drawing and proportional scaling to the observed maximum
+
+Typical use (as seen in the Multimeter tab):
+
+```javascript
+this.measurementsChart = new LineChart('measurementsChart');
+
+// later, after fetching rows from the database:
+this.measurementsChart.SetData('Wattage', watts, 'blue');
+this.measurementsChart.SetData('Voltage', volts, 'red');
+this.measurementsChart.SetData('Current', current, 'green');
+```
+
+The chart scales each series relative to its own maximum, draws connected line segments, and keeps the drawing code obvious. Because the MultiMeter daemon already timestamps every sample, the x-axis is simply sequential points—no date library or complex scale system is required.
+
+This design keeps the visualization layer as easy to maintain as the C++ daemon itself: small, obvious, and free of unnecessary abstractions.
 
 ## Project Layout
 
@@ -146,6 +171,14 @@ Logger.cpp/.h         simple logging
 Helpers.cpp/.h        CRC, threading timer, utilities
 Database.sql          reference schema
 Makefile
+
+universe/             web interface (host on Apache or equivalent)
+  index.php           front-end entry point
+  js/LineChart.js     custom lightweight multi-series line chart
+  js/                 supporting client scripts (Tab, Clock, MessageBox, …)
+  include/            PHP back-end and tab definitions
+  invoke/             AJAX endpoints
+  stylesheets/        CSS
 ```
 
 ## License / Contact
