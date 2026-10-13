@@ -1,0 +1,16 @@
+#topNavBar {
+    
+}
+
+#topNavBarCollapse {
+	overflow:hidden;
+}
+
+#topNavBarList li.bolded {
+    font-weight:bold !important;
+}
+
+#topNavBarList ul.navbar-nav {
+    padding-left:20px;
+    overflow-x:hidden;
+}
